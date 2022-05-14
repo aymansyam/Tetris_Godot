@@ -1,0 +1,83 @@
+[gd_scene load_steps=2 format=2]
+
+[sub_resource type="GDScript" id=1]
+script/source = "extends Node2D
+
+
+var gridNodeScene = preload(\"res://gridNode.tscn\")
+var gridNode
+var currentBlocks
+var rng = RandomNumberGenerator.new()
+
+
+var state = 0
+# Called when the node enters the scene tree for the first time.
+func _ready():
+	gridNode = gridNodeScene.instance()
+	add_child(gridNode)
+	generateShape()
+	
+		
+func _input(event):
+	if Input.is_action_pressed(\"ui_right\"):
+		currentBlocks = gridNode.translateRight(currentBlocks)
+	if Input.is_action_pressed(\"ui_left\"):
+		currentBlocks = gridNode.translateLeft(currentBlocks)
+	if Input.is_action_pressed(\"ui_down\"):
+		currentBlocks = gridNode.moveBlocks(currentBlocks)
+	
+func generateShape():
+	rng.randomize()
+	var num = rng.randi_range(0, 6)
+	if num == 0:
+		currentBlocks = gridNode.spawnSquare()
+		applyShadersToBlocks(currentBlocks, Color(0.25, 0.25, 0.5))
+	elif num == 1:
+		currentBlocks = gridNode.spawnL()
+		applyShadersToBlocks(currentBlocks, Color(0.25, 0.5, 0.5))
+	elif num == 2:
+		currentBlocks = gridNode.spawnS()
+		applyShadersToBlocks(currentBlocks, Color(0.75, 0.25, 0.5))
+	elif num == 3:
+		currentBlocks = gridNode.spawnT()
+		applyShadersToBlocks(currentBlocks, Color(0.65, 0.35, 0.5))
+	elif num == 4:
+		currentBlocks = gridNode.spawnStraight()
+		applyShadersToBlocks(currentBlocks, Color(0.6, 0.15, 0.5))
+	elif num == 5:
+		currentBlocks = gridNode.spawnL_inv()
+		applyShadersToBlocks(currentBlocks, Color(0.25, 0.25, 0.1))
+	elif num == 6:
+		currentBlocks = gridNode.spawnS_inv()
+		applyShadersToBlocks(currentBlocks, Color(0.25, 0.3, 0.3))
+
+
+func applyShadersToBlocks(blocks, color):
+	for block in currentBlocks:
+		block.tileRef.get_node(\"BBlock5\").modulate = color
+	
+func _on_BlockMovementTimer_timeout():
+	currentBlocks = gridNode.moveBlocks(currentBlocks)
+	
+	# TODO: fix the bug of having the tetris quickly lock if passes more than 1 piece
+	if state == 1 and not gridNode.canMoveBlocks(currentBlocks):
+		generateShape()
+		state = 0
+	if not gridNode.canMoveBlocks(currentBlocks):
+		state = 1 # will generate shape on next pass
+
+#	for block in current_blocks.size():
+#		print(\"yes\")
+		#block.set_position(Vector2()) += VERSPACE"
+
+[node name="Level" type="Node2D"]
+script = SubResource( 1 )
+
+[node name="TileMap" type="TileMap" parent="."]
+cell_size = Vector2( 42, 42 )
+format = 1
+
+[node name="BlockMovementTimer" type="Timer" parent="."]
+autostart = true
+
+[connection signal="timeout" from="BlockMovementTimer" to="." method="_on_BlockMovementTimer_timeout"]
