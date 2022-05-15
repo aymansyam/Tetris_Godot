@@ -23,11 +23,11 @@ func _ready():
 		
 func _input(event):
 	if Input.is_action_pressed(\"ui_right\"):
-		currentBlocks = gridNode.translateRight(currentBlocks)
+		currentBlocks = gridNode.translateBlocks(currentBlocks, \"right\")
 	if Input.is_action_pressed(\"ui_left\"):
-		currentBlocks = gridNode.translateLeft(currentBlocks)
+		currentBlocks = gridNode.translateBlocks(currentBlocks, \"left\")
 	if Input.is_action_pressed(\"ui_down\"):
-		currentBlocks = gridNode.moveBlocks(currentBlocks)
+		currentBlocks = gridNode.translateBlocks(currentBlocks, \"down\")
 	if Input.is_action_pressed(\"ui_up\"):
 		currentBlocks = gridNode.rotateBlocks(currentBlocks)
 	
@@ -59,17 +59,21 @@ func generateShape():
 
 func applyShadersToBlocks(blocks, color):
 	for block in currentBlocks:
-		block.tileRef[0].get_node(\"BBlock5\").modulate = color
+		block.tileRef.get_node(\"BBlock5\").modulate = color
 	
 func _on_BlockMovementTimer_timeout():
-	currentBlocks = gridNode.moveBlocks(currentBlocks)
-	if not gridNode.canMoveBlocks(currentBlocks):
+	currentBlocks = gridNode.translateBlocks(currentBlocks, \"down\")
+	if not gridNode.canTranslate(currentBlocks, \"down\"):
 		$BlockDeadEndTimer.start()
 
 
 func _on_BlockDeadEndTimer_timeout():
-	if not gridNode.canMoveBlocks(currentBlocks):
+	if not gridNode.canTranslate(currentBlocks, \"down\"):
+		gridNode.finalizeBlocks(currentBlocks)
 		generateShape()
+		
+		
+
 "
 
 [node name="Level" type="Node2D"]

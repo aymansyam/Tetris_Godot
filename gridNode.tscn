@@ -27,227 +27,159 @@ func _ready():
 				hor = k,
 				x = horIncrement,
 				y = verIncrement,
-				tileRef = [null, false] 
+				tileRef = null,
+				active = false,
 			}
 			horIncrement += HORSPACE
 		verIncrement += VERSPACE
-		
-func spawnBlock(ver, hor):
+
+
+func delete_gridNode(ver, hor):
+	gridNode[ver][hor].tileRef.queue_free()
+	gridNode[ver][hor].tileRef = null
+	gridNode[ver][hor].active = false
+
+func set_active_gridNode(ver, hor, block):
+	gridNode[ver][hor].tileRef = block
+	gridNode[ver][hor].active = true
+	
+func unactivate_gridNode(ver, hor):
+	gridNode[ver][hor].active = false
+	
+func spawn_block(ver, hor):
 	var new_block = blockScene.instance()
 	set_active_gridNode(ver, hor, new_block)
 	new_block.set_position(Vector2(gridNode[ver][hor].x, gridNode[ver][hor].y))
 	add_child(new_block)
 	return gridNode[ver][hor]
 	
-func set_active_gridNode(ver, hor, block):
-	gridNode[ver][hor].tileRef[0] = block
-	gridNode[ver][hor].tileRef[1] = true
+func finalizeBlocks(blocks):
+	for block in blocks:
+		unactivate_gridNode(block.ver, block.hor)
 
-func spawnSquare():
-	var blocks = []
-	blocks.append(spawnBlock(1,1))
-	blocks.append(spawnBlock(1,2))
-	blocks.append(spawnBlock(2,1))
-	blocks.append(spawnBlock(2,2))
-	return blocks
+func deleteFromGrid(blocks):
+	for block in blocks:
+		delete_gridNode(block.ver, block.hor)
 	
-func spawnL():
-	var blocks = []
-	blocks.append(spawnBlock(1,1))
-	blocks.append(spawnBlock(1,2))
-	blocks.append(spawnBlock(1,3))
-	blocks.append(spawnBlock(2,3))
-	return blocks
-
-func spawnS():
-	var blocks = []
-	blocks.append(spawnBlock(1,1))
-	blocks.append(spawnBlock(1,2))
-	blocks.append(spawnBlock(2,2))
-	blocks.append(spawnBlock(2,3))
-	return blocks
+func canTranslate(blocks, direction):
+	var next_i
+	var next_k
+	for block in blocks:
+		match direction:
+			\"right\": 
+				next_i = block.ver
+				next_k = block.hor + 1
+			\"left\":
+				next_i = block.ver
+				next_k = block.hor - 1
+			\"down\":
+				next_i = block.ver + 1
+				next_k = block.hor
+		if next_k > gridNode[1].size() or next_i > gridNode.size() or next_k < 1:
+			return false
+		var gridNodeElement = gridNode[next_i][next_k]
+		if not gridNodeElement.tileRef == null and gridNodeElement.active == false:
+			return false
+	return true
 	
-func spawnT():
-	var blocks = []
-	blocks.append(spawnBlock(1,1))
-	blocks.append(spawnBlock(1,2))
-	blocks.append(spawnBlock(2,2))
-	blocks.append(spawnBlock(1,3))
-	return blocks
-	
-func spawnStraight():
-	var blocks = []
-	blocks.append(spawnBlock(1,1))
-	blocks.append(spawnBlock(1,2))
-	blocks.append(spawnBlock(1,3))
-	blocks.append(spawnBlock(1,4))
-	return blocks
-	
-func spawnL_inv():
-	var blocks = []
-	blocks.append(spawnBlock(1,1))
-	blocks.append(spawnBlock(2,1))
-	blocks.append(spawnBlock(1,2))
-	blocks.append(spawnBlock(1,3))
-	return blocks
-	
-func spawnS_inv():
-	var blocks = []
-	blocks.append(spawnBlock(2,1))
-	blocks.append(spawnBlock(2,2))
-	blocks.append(spawnBlock(1,2))
-	blocks.append(spawnBlock(1,3))
-	return blocks
-
-func moveBlockToPos(block, hor, ver):
-	unactivate_gridNode(block.ver, block.hor)
-	var next_i = hor
-	var next_k = ver
-	var temp = spawnBlock(next_i, next_k)
-#	temp.tileRef[0].get_node(\"BBlock5\").modulate = block.tileRef[0].get_node(\"BBlock5\").modulate
-	return temp
-	
-func unactivate_gridNode(ver, hor):
-	gridNode[ver][hor].tileRef[0].queue_free()
-	gridNode[ver][hor].tileRef[0] = null
-	gridNode[ver][hor].tileRef[1] = false
-	
-func translateRight(blocks):
+func translateBlocks(blocks, direction):
 	var new_blocks = []
-	blocks = sortBlocksByRightMost(blocks)
-	if canTranslateBlocksRight(blocks):
+	if canTranslate(blocks, direction):
+		deleteFromGrid(blocks)
 		for block in blocks:
-			new_blocks.append(moveBlockToPos(block, block.ver, block.hor + 1))
+			match direction:
+				\"right\": 
+					new_blocks.append(spawn_block(block.ver, block.hor + 1))
+				\"left\": 
+					new_blocks.append(spawn_block(block.ver, block.hor - 1))
+				\"down\": 
+					new_blocks.append(spawn_block(block.ver + 1, block.hor))
 	if not new_blocks.size() == 0:
 		blocks = new_blocks
 	return blocks
-	
-func translateLeft(blocks):
-	var new_blocks = []
-	blocks = sortBlocksByLeftMost(blocks)
-	if canTranslateBlocksLeft(blocks):
-		for block in blocks:
-			new_blocks.append(moveBlockToPos(block, block.ver, block.hor - 1))
-	if not new_blocks.size() == 0:
-		blocks = new_blocks
-	return blocks
-	
-func moveBlocks(blocks):
-	var new_blocks = []
-	blocks = sortBlocksByLowest(blocks)
-	if canMoveBlocks(blocks):
-		for block in blocks:
-			new_blocks.append(moveBlockToPos(block, block.ver + 1, block.hor))
-	if not new_blocks.size() == 0:
-		blocks = new_blocks
-	return blocks
-	
+
 func rotateBlocks(blocks):
 	var new_blocks = []
+	var rotation_matrices = []
 	for block in blocks:
-		new_blocks.append(rotateBlock(block))
+		rotation_matrices.append(getBlockRotationPosition(block))
+	for block in blocks:
+		delete_gridNode(block.ver, block.hor)
+	for matrix in rotation_matrices:
+		new_blocks.append(spawn_block(matrix[1], matrix[0]))
 	if not new_blocks.size() == 0:
 		blocks = new_blocks
 	return blocks
 
-func rotateBlock(block):
-	var rot_mat = [[0, -1], [-1, 0]]
+func getBlockRotationPosition(block):
+	var rot_mat = [[0, -1], [1, 0]]
 	var matrix = [[block.hor], [block.ver]]
 	var result_m = mlib.multiply(rot_mat, matrix)
 	var new_matrix = []
 	for result in result_m:
 		for i in result:
-			new_matrix.append(i*-1)
-	block = moveBlockToPos(block, gridNode[new_matrix[0]][new_matrix[1]].hor, gridNode[new_matrix[0]][new_matrix[1]].ver)
-	return block
+			new_matrix.append(abs(i))
+	return new_matrix
 
 
-func sortBlocksByLowest(blocks):
-	var new_blocks = []
-	while blocks.size() != 0:
-		var toBeAppended = getLowestBlockInArray(blocks)
-		new_blocks.append(toBeAppended)
-		blocks.erase(toBeAppended)
-	return new_blocks
-	
-func sortBlocksByRightMost(blocks):
-	var new_blocks = []
-	while blocks.size() != 0:
-		var toBeAppended = getRightMostBlockInArray(blocks)
-		new_blocks.append(toBeAppended)
-		blocks.erase(toBeAppended)
-	return new_blocks
-	
-func sortBlocksByLeftMost(blocks):
-	var new_blocks = []
-	while blocks.size() != 0:
-		var toBeAppended = getLeftMostBlockInArray(blocks)
-		new_blocks.append(toBeAppended)
-		blocks.erase(toBeAppended)
-	return new_blocks
-	
-func getRightMostBlockInArray(blocks):
-	var rightmost = 0
-	var rightmost_block
-	for block in blocks:
-		if block.hor >= rightmost:
-			rightmost_block = block
-			rightmost = block.hor
-	return rightmost_block
-	
-func getLeftMostBlockInArray(blocks):
-	var leftmost = END_HOR
-	var leftmost_block
-	for block in blocks:
-		if block.hor <= leftmost:
-			leftmost_block = block
-			leftmost = block.hor
-	return leftmost_block
-
-func getLowestBlockInArray(blocks):
-	var lowest = 0
-	var lowest_block
-	for block in blocks:
-		if block.ver >= lowest:
-			lowest_block = block
-			lowest = block.ver
-	return lowest_block
-	
-func canMoveBlocks(blocks):
-	for block in blocks:
-		var next_i = block.ver + 1
-		var next_k = block.hor
-		if next_i > gridNode.size():
-			return false
-		var gridNodeElement = gridNode[next_i][next_k]
-		if gridNodeElement.tileRef[1] == false and not gridNodeElement.tileRef[0] == null:
-			return false
-	return true
-	
-func canTranslateBlocksRight(blocks):
-	for block in blocks:
-		var next_i = block.ver
-		var next_k = block.hor + 1
-		if next_k > gridNode[1].size():
-			return false
-		var gridNodeElement = gridNode[next_i][next_k]
-		if gridNodeElement.tileRef[1] == false and not gridNodeElement.tileRef[0] == null:
-			return false
-	return true
-		
-		
-func canTranslateBlocksLeft(blocks):
-	for block in blocks:
-		var next_i = block.ver
-		var next_k = block.hor - 1
-		if next_k < 1:
-			return false
-		var gridNodeElement = gridNode[next_i][next_k]
-		if gridNodeElement.tileRef[1] == false and not gridNodeElement.tileRef[0] == null:
-			return false
-	return true
 
 
+func spawnSquare():
+	var blocks = []
+	blocks.append(spawn_block(1,1))
+	blocks.append(spawn_block(1,2))
+	blocks.append(spawn_block(2,1))
+	blocks.append(spawn_block(2,2))
+	return blocks
+	
+func spawnL():
+	var blocks = []
+	blocks.append(spawn_block(1,1))
+	blocks.append(spawn_block(1,2))
+	blocks.append(spawn_block(1,3))
+	blocks.append(spawn_block(2,3))
+	return blocks
+
+func spawnS():
+	var blocks = []
+	blocks.append(spawn_block(1,1))
+	blocks.append(spawn_block(1,2))
+	blocks.append(spawn_block(2,2))
+	blocks.append(spawn_block(2,3))
+	return blocks
+	
+func spawnT():
+	var blocks = []
+	blocks.append(spawn_block(1,1))
+	blocks.append(spawn_block(1,2))
+	blocks.append(spawn_block(2,2))
+	blocks.append(spawn_block(1,3))
+	return blocks
+	
+func spawnStraight():
+	var blocks = []
+	blocks.append(spawn_block(1,1))
+	blocks.append(spawn_block(1,2))
+	blocks.append(spawn_block(1,3))
+	blocks.append(spawn_block(1,4))
+	return blocks
+	
+func spawnL_inv():
+	var blocks = []
+	blocks.append(spawn_block(1,1))
+	blocks.append(spawn_block(2,1))
+	blocks.append(spawn_block(1,2))
+	blocks.append(spawn_block(1,3))
+	return blocks
+	
+func spawnS_inv():
+	var blocks = []
+	blocks.append(spawn_block(2,1))
+	blocks.append(spawn_block(2,2))
+	blocks.append(spawn_block(1,2))
+	blocks.append(spawn_block(1,3))
+	return blocks
+	
 
 
 
