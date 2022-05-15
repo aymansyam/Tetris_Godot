@@ -9,13 +9,16 @@ var gridNode
 var currentBlocks
 var rng = RandomNumberGenerator.new()
 
+const MOVE_TIME = 0.5
+const DEAD_END_TIME = MOVE_TIME
 
-var state = 0
 # Called when the node enters the scene tree for the first time.
 func _ready():
 	gridNode = gridNodeScene.instance()
 	add_child(gridNode)
 	generateShape()
+	$BlockMovementTimer.wait_time = MOVE_TIME
+	$BlockDeadEndTimer.wait_time = DEAD_END_TIME
 	
 		
 func _input(event):
@@ -25,6 +28,8 @@ func _input(event):
 		currentBlocks = gridNode.translateLeft(currentBlocks)
 	if Input.is_action_pressed(\"ui_down\"):
 		currentBlocks = gridNode.moveBlocks(currentBlocks)
+	if Input.is_action_pressed(\"ui_up\"):
+		currentBlocks = gridNode.rotateBlocks(currentBlocks)
 	
 func generateShape():
 	rng.randomize()
@@ -54,21 +59,18 @@ func generateShape():
 
 func applyShadersToBlocks(blocks, color):
 	for block in currentBlocks:
-		block.tileRef.get_node(\"BBlock5\").modulate = color
+		block.tileRef[0].get_node(\"BBlock5\").modulate = color
 	
 func _on_BlockMovementTimer_timeout():
 	currentBlocks = gridNode.moveBlocks(currentBlocks)
-	
-	# TODO: fix the bug of having the tetris quickly lock if passes more than 1 piece
-	if state == 1 and not gridNode.canMoveBlocks(currentBlocks):
-		generateShape()
-		state = 0
 	if not gridNode.canMoveBlocks(currentBlocks):
-		state = 1 # will generate shape on next pass
+		$BlockDeadEndTimer.start()
 
-#	for block in current_blocks.size():
-#		print(\"yes\")
-		#block.set_position(Vector2()) += VERSPACE"
+
+func _on_BlockDeadEndTimer_timeout():
+	if not gridNode.canMoveBlocks(currentBlocks):
+		generateShape()
+"
 
 [node name="Level" type="Node2D"]
 script = SubResource( 1 )
@@ -80,4 +82,8 @@ format = 1
 [node name="BlockMovementTimer" type="Timer" parent="."]
 autostart = true
 
+[node name="BlockDeadEndTimer" type="Timer" parent="."]
+autostart = true
+
 [connection signal="timeout" from="BlockMovementTimer" to="." method="_on_BlockMovementTimer_timeout"]
+[connection signal="timeout" from="BlockDeadEndTimer" to="." method="_on_BlockDeadEndTimer_timeout"]

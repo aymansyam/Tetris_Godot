@@ -3,6 +3,8 @@
 [sub_resource type="GDScript" id=1]
 script/source = "extends Node2D
 
+const Matrix = preload(\"res://matrix_functions.gd\")
+var mlib = Matrix.new()
 const HORSPACE = 42 # WARNING: based on 420 x 840 aspect ratio
 const VERSPACE = 42
 
@@ -25,18 +27,21 @@ func _ready():
 				hor = k,
 				x = horIncrement,
 				y = verIncrement,
-				tileRef = null,
+				tileRef = [null, false] 
 			}
 			horIncrement += HORSPACE
 		verIncrement += VERSPACE
 		
 func spawnBlock(ver, hor):
 	var new_block = blockScene.instance()
-	gridNode[ver][hor].tileRef = new_block
+	set_active_gridNode(ver, hor, new_block)
 	new_block.set_position(Vector2(gridNode[ver][hor].x, gridNode[ver][hor].y))
 	add_child(new_block)
 	return gridNode[ver][hor]
 	
+func set_active_gridNode(ver, hor, block):
+	gridNode[ver][hor].tileRef[0] = block
+	gridNode[ver][hor].tileRef[1] = true
 
 func spawnSquare():
 	var blocks = []
@@ -93,26 +98,26 @@ func spawnS_inv():
 	blocks.append(spawnBlock(1,2))
 	blocks.append(spawnBlock(1,3))
 	return blocks
-	
-func moveBlock(block, dir):
-	var next_i = block.ver
-	var next_k = block.hor
-	match dir:
-		\"right\": next_k += 1
-		\"down\": next_i += 1
-		\"left\": next_k -= 1
+
+func moveBlockToPos(block, hor, ver):
+	unactivate_gridNode(block.ver, block.hor)
+	var next_i = hor
+	var next_k = ver
 	var temp = spawnBlock(next_i, next_k)
-	temp.tileRef.get_node(\"BBlock5\").modulate = block.tileRef.get_node(\"BBlock5\").modulate
-	gridNode[block.ver][block.hor].tileRef.queue_free()
-	gridNode[block.ver][block.hor].tileRef = null
+#	temp.tileRef[0].get_node(\"BBlock5\").modulate = block.tileRef[0].get_node(\"BBlock5\").modulate
 	return temp
+	
+func unactivate_gridNode(ver, hor):
+	gridNode[ver][hor].tileRef[0].queue_free()
+	gridNode[ver][hor].tileRef[0] = null
+	gridNode[ver][hor].tileRef[1] = false
 	
 func translateRight(blocks):
 	var new_blocks = []
 	blocks = sortBlocksByRightMost(blocks)
 	if canTranslateBlocksRight(blocks):
 		for block in blocks:
-			new_blocks.append(moveBlock(block, \"right\"))
+			new_blocks.append(moveBlockToPos(block, block.ver, block.hor + 1))
 	if not new_blocks.size() == 0:
 		blocks = new_blocks
 	return blocks
@@ -122,7 +127,7 @@ func translateLeft(blocks):
 	blocks = sortBlocksByLeftMost(blocks)
 	if canTranslateBlocksLeft(blocks):
 		for block in blocks:
-			new_blocks.append(moveBlock(block, \"left\"))
+			new_blocks.append(moveBlockToPos(block, block.ver, block.hor - 1))
 	if not new_blocks.size() == 0:
 		blocks = new_blocks
 	return blocks
@@ -132,11 +137,31 @@ func moveBlocks(blocks):
 	blocks = sortBlocksByLowest(blocks)
 	if canMoveBlocks(blocks):
 		for block in blocks:
-			new_blocks.append(moveBlock(block, \"down\"))
+			new_blocks.append(moveBlockToPos(block, block.ver + 1, block.hor))
 	if not new_blocks.size() == 0:
 		blocks = new_blocks
 	return blocks
 	
+func rotateBlocks(blocks):
+	var new_blocks = []
+	for block in blocks:
+		new_blocks.append(rotateBlock(block))
+	if not new_blocks.size() == 0:
+		blocks = new_blocks
+	return blocks
+
+func rotateBlock(block):
+	var rot_mat = [[0, -1], [-1, 0]]
+	var matrix = [[block.hor], [block.ver]]
+	var result_m = mlib.multiply(rot_mat, matrix)
+	var new_matrix = []
+	for result in result_m:
+		for i in result:
+			new_matrix.append(i*-1)
+	block = moveBlockToPos(block, gridNode[new_matrix[0]][new_matrix[1]].hor, gridNode[new_matrix[0]][new_matrix[1]].ver)
+	return block
+
+
 func sortBlocksByLowest(blocks):
 	var new_blocks = []
 	while blocks.size() != 0:
@@ -195,7 +220,7 @@ func canMoveBlocks(blocks):
 		if next_i > gridNode.size():
 			return false
 		var gridNodeElement = gridNode[next_i][next_k]
-		if gridNodeElement.tileRef != null and not blocksArrayContainsTileRef(blocks, gridNodeElement.tileRef):
+		if gridNodeElement.tileRef[1] == false and not gridNodeElement.tileRef[0] == null:
 			return false
 	return true
 	
@@ -206,7 +231,7 @@ func canTranslateBlocksRight(blocks):
 		if next_k > gridNode[1].size():
 			return false
 		var gridNodeElement = gridNode[next_i][next_k]
-		if gridNodeElement.tileRef != null and not blocksArrayContainsTileRef(blocks, gridNodeElement.tileRef):
+		if gridNodeElement.tileRef[1] == false and not gridNodeElement.tileRef[0] == null:
 			return false
 	return true
 		
@@ -218,15 +243,9 @@ func canTranslateBlocksLeft(blocks):
 		if next_k < 1:
 			return false
 		var gridNodeElement = gridNode[next_i][next_k]
-		if gridNodeElement.tileRef != null and not blocksArrayContainsTileRef(blocks, gridNodeElement.tileRef):
+		if gridNodeElement.tileRef[1] == false and not gridNodeElement.tileRef[0] == null:
 			return false
 	return true
-	
-func blocksArrayContainsTileRef(blocks, tileRef):
-	for block in blocks:
-		if block.tileRef == tileRef:
-			return true
-	return false
 
 
 
